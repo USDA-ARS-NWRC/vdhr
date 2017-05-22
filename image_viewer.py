@@ -41,7 +41,7 @@ class DynamicImshow():
         """
 
         #TO-DO to be updated to manage multiple rows
-        fig, axarray= plt.subplots(1, len(self.ds), sharex='col', sharey='row')
+        fig, axarray = plt.subplots(1, len(self.ds), sharex='col', sharey='row')
 
         #Create a surface plot of each timestep starting here, intiialized below.
         for j,ax in enumerate(axarray):
@@ -52,7 +52,7 @@ class DynamicImshow():
             self.ims.append(im)
 
         #Update each plot and create a animation to show
-        ani = animation.FuncAnimation(fig, self.updatefig, interval=50, blit=True)
+        ani = animation.FuncAnimation(fig, self.updatefig, interval=1000, blit=True)
         plt.show()
         self.close()
 
@@ -79,7 +79,7 @@ class DynamicImshow():
         """
         self.i+=1
 
-        if self.i > 10:
+        if self.i > 3000:
             self.i = 0
         for j in range(len(self.ims)):
             self.ims[j].set_array(self.f(self.i))
@@ -92,10 +92,9 @@ class DynamicImshow():
 
 
 if __name__ == "__main__":
-    fnames = ["/home/micahjohnson/Desktop/test_output/precip.nc",
-              "/home/micahjohnson/Desktop/test_output/air_temp.nc",
-              "/home/micahjohnson/Desktop/test_output/dew_point.nc"]
-    vars_lst = ['precip','air_temp','dew_point']
+    fnames = ["../smrf_runs/full_output/precip.nc",
+	      "../smrf_runs/full_output/snow_density.nc"]
+    vars_lst = ['precip','snow_density']
 
     t = DynamicImshow(vars_lst, fname_lst = fnames)
     t.animate()
