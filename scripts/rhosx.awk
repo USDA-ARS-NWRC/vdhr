@@ -1,3 +1,4 @@
+he Latest AWK code:
 #! /usr/bin/awk -f
 
 BEGIN {
@@ -7,13 +8,15 @@ BEGIN {
 	c1_min = 0.026
 	c1_max = 0.069
 	c1r = 0.043
+	c_min = 0.0067
+	cfac = 0.0013
 	Tmin = -10.0
 	Tmax = 0.0
 	Tz = 0.0
 	Tr0 = 0.5
 	Pcr0 = 0.25
 	Pc0 = 0.75
-	
+
 	water = 1000.0
 
 	print "Tpp\tpp\tswe\t%sno\trho-ns\tdrho-c\tdrho-m\trho-s\trho\tzs\n"
@@ -45,7 +48,7 @@ NR == 1  &&  NF == 1  &&  $1 == "help" {
 		pcs = (((-Tpp) / Tr0) * Pcr0) + Pc0
 	else if ((Tpp > 0.0) && (Tpp <= (Tmax +1.0)))
 		pcs = (((-Tpp) / (Tmax + 1.0)) * Pc0) + Pc0
- 	else 
+ 	else
 		pcs = 0.0
 
 	pp = $2
@@ -62,13 +65,14 @@ NR == 1  &&  NF == 1  &&  $1 == "help" {
 
 		rho_ns = (50 + (1.7 * (((Tpp - Tz) + 15)^ex))) / water
 
-# proportional total storm mass compaction
-		d_rho_c = (0.026 * exp(-0.08 * (Tz - tsnow)) * swe * exp(-21.0 * rho_ns))
+# porportional total storm mass compaction
+		d_rho_c = (0.026 * exp(-0.08 *(Tz - tsnow)) * swe * exp(-21.0 * rho_ns))
 
+# proportional temperature compaction
 		if ((rho_ns * water) < 100.0)
 			c11 = 1.0
 		else
-			c11 = exp(-0.046 * ((rho_ns * water) - 100.0))
+			c11 = (c_min + ((Tz - tsnow) * cfac)) + 1.0
 
 		d_rho_m = 0.01 * c11 * exp(-0.04 * (Tz - tsnow))
 
@@ -94,11 +98,9 @@ NR == 1  &&  NF == 1  &&  $1 == "help" {
 	}
 # convert densities from proportions, to kg/m^3 or mm/m^2
 	rho_ns *= water
-	d_rho_c *= water
-	d_rho_m *= water
 	rho_s *= water
 	rho *= water
 
 # print results
-	printf "%.1f\t%.1f\t%.1f\t%.2f\t%.0f\t%.2f\t%.2f\t%.0f\t%.0f\t%.1f\n", Tpp, pp, swe, pcs, rho_ns, d_rho_c, d_rho_m, rho_s, rho, zs
+	printf "%.1f\t%.1f\t%.1f\t%.2f\t%.0f\t%.4f\t%.4f\t%.0f\t%.0f\t%.1f\n", Tpp, pp, swe, pcs, rho_ns, d_rho_c, d_rho_m, rho_s, rho, zs
 }

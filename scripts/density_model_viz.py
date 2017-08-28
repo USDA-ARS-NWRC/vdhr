@@ -62,7 +62,7 @@ def plot_multi_dim_surf(x_col_name, y_col_name, z_col_name, df):
     ax.imshow(df[x_col_name], df[y_col_name], df[z_col_name])
     return ax
 
-def plot_all_density_domain(tmin = -12, tmax = 2, precip_min =0, precip_max = 500):
+def plot_all_density_domain(tmin = -12, tmax = 2, precip_min = 0, precip_max = 500):
 
         t_delta = 0.01
 
@@ -121,9 +121,9 @@ def plot_all_density_domain(tmin = -12, tmax = 2, precip_min =0, precip_max = 50
             ax = axarray[i][j]
 
             plot_extent = [T.min(), T.max(), PP.min(), PP.max()]
-            im = ax.imshow(v,extent= plot_extent,
+            im = ax.imshow(v, extent = plot_extent,
             interpolation='nearest', origin='lower',aspect='auto')
-            f.colorbar(im, ax=ax)
+            f.colorbar(im, ax = ax)
 
             #Throw some contours on it.
             if len(levels_dict[k]) > 0:
