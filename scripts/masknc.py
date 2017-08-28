@@ -6,9 +6,9 @@ import os
 #Convert an ascii file to netcdf
 parser = argparse.ArgumentParser()
 
-parser.add_argument("mask.nc", type=str,
+parser.add_argument("mask", type=str,
                     help="Full filename for mask netcdf file.")
-parser.add_argument("unmasked_var.nc", type=str,
+parser.add_argument("unmasked_var", type=str,
                     help="Full filename for netcdf file to mask.")
 
 
@@ -16,7 +16,7 @@ parser.add_argument("variable", type=str,
                     help="variable name in unmasked_var.nc")
 
 
-parser.add_argument("-o","--output_netcdf", type=str,
+parser.add_argument("-o","--output", type=str,
                     help="""output file. If none is provided, the
                     filename is the same as the ascii file but in current directory and
                     with the netcdf file extension.""",
@@ -24,50 +24,33 @@ parser.add_argument("-o","--output_netcdf", type=str,
 
 
 args = parser.parse_args()
-
-#parse the header
-with open(args.ascii_file) as f:
-    i = 0
-    txt = f.readline()
-    data = txt.split('\t')
-    hdata = {}
-
-    while len(data) == 2:
-        txt = f.readline()
-        hdata[data[0]] = int(data[1])
-        data = txt.split('\t')
-        i+=1
-    f.close()
-
-ascii_data = np.genfromtxt(args.ascii_file,skip_header=i)
+unmasked = Dataset(args.unmasked_var,'r')
+variable_name = args.variable
+mask = Dataset(args.mask)
 
 #Parse the option name
-if args.output_netcdf is None:
+if args.output is None:
     #Isolate the name of the input file and use it for netcdf
-    out_fname = (os.path.split(args.ascii_file)[-1]).split('.')[0]+'.nc'
+    out_fname = "masked_"+(os.path.split(args.unmasked_var)[-1]).split('.')[0]+'.nc'
 else:
-    out_fname = args.output_netcdf
+    out_fname = args.output
 
+print "writing masked result to {0}".format(out_fname)
 output = Dataset("."+os.sep+out_fname,'w')
 
-x = np.arange(hdata['xllcorner'], hdata['xllcorner'] + hdata["ncols"]*hdata['cellsize'], hdata['cellsize'])
-y = np.arange(hdata['yllcorner'], hdata['yllcorner'] + hdata["nrows"]*hdata["cellsize"], hdata["cellsize"])
 
-output.createDimension('x', None)
-output.createDimension('y',None)
+for name, dimension in unmasked.dimensions.iteritems():
+    output.createDimension(name, len(dimension) if not dimension.isunlimited() else None)
 
-output.createVariable('x','f4',('x',))
-output.createVariable('y','f4',('y',))
-output.createVariable('mask','f4',('y','x'))
+for name, variable in unmasked.variables.iteritems():
 
+    var = output.createVariable(name, variable.datatype, variable.dimensions)
+    print name
+    # take out the variable you don't want
+    if name != variable_name:
+        output.variables[name][:] = unmasked.variables[name][:]
 
-
-output.variables['x'][:] = x
-output.variables['y'][:] = y
-print x.shape
-print y.shape
-print ascii_data.shape
-print hdata
-output.variables['mask'][:]= ascii_data
+for t in unmasked.variables['time'][:]:
+    output.variables[variable_name][t,:,:]= unmasked.variables[variable_name][t,:,:]*mask.variables['mask'][:]
 
 output.close()

@@ -64,3 +64,5 @@ print hdata
 output.variables['mask'][:]= ascii_data
 
 output.close()
+
+print " To calculate the masked file use ncbo -op_typ=multiply your.nc mask.nc output.nc"
