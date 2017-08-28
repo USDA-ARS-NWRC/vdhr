@@ -23,7 +23,7 @@ class DynamicImshow():
                     self.ds.append(Dataset(fname,'r'))
                     self.variable_lst.append(variable_lst[i])
                 else:
-                    print "Error: File does not exitst \n {0}".format(fname)
+                    print "Error: File does not exist \n {0}".format(fname)
 
         elif fname_lst == None and type(ds_lst)==list:
             self.ds = ds_lst
