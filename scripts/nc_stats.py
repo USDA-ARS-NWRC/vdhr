@@ -4,8 +4,42 @@ from netCDF4 import Dataset
 import numpy as np
 import progressbar as pb
 import argparse
+import os
+from collections import OrderedDict
 
-def calc_stats():
+def calc_stats(img, non_zero = False):
+    '''
+    args:
+        img: a numpy array of any dimension and size
+        non_zero: Calculate stats not including zero (defaults false)
+    returns:
+        result: dictionary containing max, min, avg standard deviation
+    '''
+    result = OrderedDict()
+    if non_zero:
+        img_id = img!=0.0
+    else:
+        img_id = img==img
+
+    result['maximum'] = np.max(img[img_id])
+    result['minimum'] = np.min(img[img_id])
+    result['avgerage'] = np.average(img[img_id])
+    result['standard deviation'] = np.std(img[img_id])
+    return result
+
+def return_img_and_message(img,dimension_value):
+
+    if dimension_value == None:
+        value_str = "All"
+        img = img[:]
+    else:
+        value_str = dimension_value
+        img = img[dimension_value]
+
+    data_description = "{0} = {1}".format(name,value_str)
+    return img,data_description
+
+def main():
 
     parser = argparse.ArgumentParser(description='Calculate Statistics on NetCDF Files.')
 
@@ -18,82 +52,65 @@ def calc_stats():
     parser.add_argument('-t', dest='timestep', help="Isolates a timestep from file", )
     parser.add_argument('-x', dest='x_coor', help="Specify an x coordinate to run statistics on ")
     parser.add_argument('-y', dest='y_coor', help="Specify an y coordinate to run statistics on ")
+    parser.add_argument('-nz', dest='non_zero', action='store_true', help="Disables any zero from being the min value")
 
     args = parser.parse_args()
+    filename = os.path.abspath(os.path.expanduser(args.filename))
+    if not os.path.isfile(filename):
+        print("File Does not exist. {0}".format(filename))
+        sys.exit()
 
     print "Processing netCDF statistics...\n"
-    print "Filename: {0}".format(args.filename)
+    print "Filename: {0}".format(filename)
 
     #Open data set
-    ds = Dataset(args.filename, 'r')
+    ds = Dataset(filename, 'r')
     f = ds.variables[args.variable]
 
     #collect important info create arrays
     nt,nx,ny = np.shape(f)
-    maxes = []
-    mins = []
-    means = []
 
     #Create a progress bar to info the user
     bar = pb.ProgressBar(max_value=nt)
 
-    #Check what the user wants. Always output basin wide/all time results
-    operations = ['maximum','minimum','average']
-    data_description = ['All time']
+    #Use an dict to store stats for easy recall
+    data = OrderedDict()
 
-    #User requested a specific timestep
-    #if timestep !=None and x_coor == None and y_coor == None:
     # Always show the user the whole basin and through all time.
     img = f[:,:,:]
-    maxes.append(np.max(img))
-    mins.append(np.min(img))
-    means.append(np.average(img))
+    data['Entire Image Domain'] = calc_stats(img,args.non_zero)
 
-    #User requested single row for all timesteps
-    if args.timestep == None and args.x_coor != None and args.y_coor == None:
-        data_description.append('At X={0}'.format(args.x_coor))
-        img = f[:,:,args.x_coor]
-        maxes.append(np.max(img))
-        mins.append(np.min(img))
-        means.append(np.average(img))
+    #Check what the user wants. Always output basin wide/all time results
+    data_description = 'At '
 
-    #User requested single column for all timesteps
-    if args.timestep == None and args.x_coor == None and args.y_coor != None:
-        data_description.append('At Y={0}'.format(args.y_coor))
-        img = f[:,args.y_coor,:]
-        maxes.append(np.max(img))
-        mins.append(np.min(img))
-        means.append(np.average(img))
+    if args.timestep != None or args.y_coor !=None or args.x_coor != None:
 
-    #User requested single point for all timesteps
-    if args.timestep == None and args.x_coor != None and args.y_coor != None:
-        data_description.append('At X={0}, Y={1}'.format(args.x_coor,args.y_coor))
-        img = f[:,args.y_coor,args.x_coor]
-        maxes.append(np.max(img))
-        mins.append(np.min(img))
-        means.append(np.average(img))
-
-    if args.timestep != None and args.x_coor != None and args.y_coor != None:
-        data_description.append('At T={0},X={1}, Y={2}'.format(args.timestep,args.x_coor,args.y_coor))
-        img = f[args.timestep,args.y_coor,args.x_coor]
-        maxes.append(np.max(img))
-        mins.append(np.min(img))
-        means.append(np.average(img))
+        for arg in [args.timestep,args.y_coor,args.x_coor]:
+            img,msg = return_index_and_message(img,arg)
+            data_description += msg
 
 
-    ds.close()
+        data[data_description] = calc_stats(new_img, non_zero = args.non_zero)
+
+
     msg_str =  " "*3 + "NetCDF statistics" + " "*3
 
     print "="*len(msg_str)
     print msg_str
     print "="*len(msg_str)
     print ""
+    print "Total Time Steps = {0}".format(nt)
+    print "Total Number of Columns = {0}".format(nx)
+    print "Total Number of Rows = {0}".format(ny)
+    print ""
+
     #Output to screen
-    for i,s in enumerate(data_description):
-        print "{0} maximum {1}: {2}".format(s,args.variable,maxes[i])
-        print "{0} minimum {1}: {2}".format(s,args.variable,mins[i])
-        print "{0} average {1}: {2}\n".format(s,args.variable,means[i])
+    for k,v in data.items():
+        for description,value in v.items():
+            print "{0}: {1}".format(description,value)
 
 
+
+    ds.close()
 if __name__ == '__main__':
-    calc_stats()
+    main()
