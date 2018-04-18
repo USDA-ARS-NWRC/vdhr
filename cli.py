@@ -12,7 +12,7 @@ def make_movie_over_lay(fname, variables):
         fname - Path to NetCDF
         variables -list of strings naming variables to output
     """
-    kmz=ncEarth.ncWRFFire_mov(fname)
+    kmz=ncEarth.ncNWRC_mov(fname)
     kmz.write('thickness','output.kmz')
 
 

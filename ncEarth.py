@@ -5,14 +5,12 @@ A simple python module for creating images out of netcdf arrays and outputing
 kml files for Google Earth.   The base class ncEarth cannot be used on its own,
 it must be subclassed with certain functions overloaded to provide location and
 plotting that are specific to a model's output files.
-Requires matplotlib and Scientific python.
+
 Use as follows:
 import ncEarth
-kml=ncEarth.ncEpiSim('episim_0010.nc')
-kml.write_kml(['Susceptible','Infected','Recovered','Dead'])
-or
-kmz=ncEarth.ncWRFFire_mov('wrfout')
-kmz.write('FGRNHFX','fire.kmz')
+
+kmz=ncEarth.ncNWRC_mov('wrfout')
+kmz.write('FGRNHFX','out.kmz')
 Author: Jonathan Beezley (jon.beezley@gmail.com)
 Date: Oct 5, 2010
 Original gist at https://gist.github.com/jbeezley/611869
@@ -23,7 +21,6 @@ Date: April 17, 2018
 
 from matplotlib import pylab
 import numpy as np
-#from Scientific.IO import NetCDF
 from netCDF4 import Dataset
 import cStringIO
 from datetime import datetime,timedelta
@@ -31,14 +28,21 @@ import zipfile
 import shutil,os
 import pandas as pd
 import utm
-
+import numpy as np
+import seaborn as sns
+import cmocean
+sns.set()
 
 class ncEarth(object):
 
-    """Base class for reading NetCDF files and writing kml for Google Earth."""
+    """
+    Base class for reading NetCDF files and writing kml for Google Earth.
+    """
 
     kmlname='ncEarth.kml'  # default name for kml output file
     progname='baseClass'   # string describing the model (overload in subclass)
+    colormap = cmocean.cm.haline_r
+    colormap.set_bad(alpha=0.0)
 
     # base kml file format string
     # creates a folder containing all images
@@ -83,7 +87,7 @@ class ncEarth(object):
     beginstr='<begin>%s</begin>'
     endstr='<end>%s</end>'
 
-    def __init__(self,filename,hsize=5):
+    def __init__(self,filename,hsize=10):
         """
         Class constructor:
         filename : string NetCDF file to read
@@ -125,6 +129,12 @@ class ncEarth(object):
         fig=pylab.figure(figsize=(self.hsize,self.hsize*float(v.shape[0])/v.shape[1]))
 
         ax=fig.add_axes([0,0,1,1])
+        v = np.flipud(v)
+        #self.colormap.set_under("r", alpha = 0.0)
+        zeros = v<1.0
+        v[zeros]=np.NaN
+        self.colormap.set_bad(alpha=0.0)
+
         pylab.imshow(v)
         pylab.axis('off')
         self.process_image()
@@ -132,7 +142,7 @@ class ncEarth(object):
         # create a string buffer to save the file
         im=cStringIO.StringIO()
 
-        pylab.savefig(im,format='png')
+        pylab.savefig(im,format='png',transparent=True,dpi = 1200)
 
         # return the buffer
         return im.getvalue()
@@ -197,46 +207,18 @@ class ncEarth(object):
         f.write(kml)
         f.close()
 
-class ncEpiSim(ncEarth):
+
+class ncNWRC(ncEarth):
     """
-    Epidemic model file class.
-    """
-
-    kmlname='epidemic.kml'
-    progname='EpiSim'
-
-    def get_bounds(self):
-        """
-        Get the lat/lon bounds of the output file... assumes regular lat/lon (no projection)
-        """
-        lat=self.f.variables['latitude']
-        lon=self.f.variables['longitude']
-
-        lat1=lat[0]
-        lat2=lat[-1]
-        lon1=lon[0]
-        lon2=lon[-1]
-
-        return (lon1,lon2,lat1,lat2)
-
-    def view_function(self,a):
-        """
-        We display populations in log scale so they look better
-        """
-        return a#pylab.log(a)
-
-class ncWRFFire(ncEarth):
-    """
-    WRF-Fire model file class.
+    Netcdf files produced by ARS-NWRC file class.
     """
 
-    kmlname='fire.kml'
-    progname='WRF-Fire'
-    wrftimestr='%Y-%m-%d_%H:%M:%S'
+    kmlname='NWRC.kml'
+    progname='NWRC'
 
-    def __init__(self,filename,hsize=5,istep=0):
+    def __init__(self,filename,hsize=10,istep=0):
         """
-        Overloaded constructor for WRF output files:
+        Overloaded constructor for Netcdf output files from SMRF or AWSM:
            filename : output NetCDF file
            hsize : output image width in inches
            istep : time slice to output (between 0 and the number of timeslices in the file - 1)
@@ -245,7 +227,7 @@ class ncWRFFire(ncEarth):
         f = Dataset(filename,'r')
         start = ((f.variables['time'].units).split('since')[-1]).strip()
         start = pd.to_datetime(start)
-        self.times = [start+timedelta(days=int(t)) for t in f.variables['time'][:]]
+        self.times = [start+timedelta(seconds=3600*t) for t in f.variables['time'][:]]
         self.istep=istep
 
 
@@ -266,7 +248,7 @@ class ncWRFFire(ncEarth):
 
     def get_array(self,vname):
         """
-        Return a single time slice of a variable from a WRF output file.
+        Return a single time slice of a variable from a Netcdf file.
         """
         v=self.f.variables[vname]
         v=v[self.istep,:,:]
@@ -275,37 +257,37 @@ class ncWRFFire(ncEarth):
 
     def get_time(self):
         """
-        Process the time information from the WRF output file to create a
+        Process the time information from the Netcdf output file to create a
         proper kml TimeInterval specification.
         """
         start=''
         end=''
         time=''
         times=self.times
-
+        print(times[self.istep])
         if self.istep > 0:
             start=ncEarth.beginstr % times[self.istep].isoformat()
 
 
         if self.istep < len(times)-2:
-            print(times[self.istep+1])
             end = ncEarth.endstr % times[self.istep+1].isoformat()
 
         if start is not '' or end is not '':
             time=ncEarth.timestr % {'begin':start,'end':end}
+
         return time
 
     def view_function(self,v):
         return pylab.log(v)
 
 
-class ncWRFFire_mov(object):
+class ncNWRC_mov(object):
 
     """
-    A class the uses ncWRFFire to create animations from WRF history output file.
+    A class the uses ncNWRC to create animations from Netcdf time series images.
     """
 
-    def __init__(self,filename,hsize=5,nstep=None):
+    def __init__(self,filename,hsize=10,nstep=None):
         """
         Class constructor:
         filename : NetCDF output file name
@@ -326,7 +308,7 @@ class ncWRFFire_mov(object):
 
     def write(self,vname,kmz='out.kmz'):
         """
-        Create a kmz file from multiple time steps of a wrfout file.
+        Create a kmz file from multiple time steps of a Netcdf file.
         vname : the variable name to visualize
         kmz : optional, the name of the file to save the kmz to
         """
@@ -345,16 +327,15 @@ class ncWRFFire_mov(object):
         # loop through all time slices and create the image data
         # appending to the kml content string for each image
         for i in xrange(0,self.nstep,1):
-            print i
-            kml=ncWRFFire(self.filename,istep=i)
+            kml=ncNWRC(self.filename,istep=i)
             img=vstr % (vname,i)
             imgs.append(img)
             content.append(kml.image2kml(vname,img))
 
         # create the main kml file
-        kml=ncWRFFire.kmlstr % \
+        kml=ncNWRC.kmlstr % \
             {'content':'\n'.join(content),\
-             'prog':ncWRFFire.progname}
+             'prog':ncNWRC.progname}
 
         # create a zipfile to store all images + kml into a single compressed file
         z=zipfile.ZipFile(kmz,'w',compression=zipfile.ZIP_DEFLATED)
