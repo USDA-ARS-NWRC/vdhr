@@ -87,7 +87,7 @@ class ncEarth(object):
     beginstr='<begin>%s</begin>'
     endstr='<end>%s</end>'
 
-    def __init__(self,filename,hsize=10):
+    def __init__(self,filename,hsize=5):
         """
         Class constructor:
         filename : string NetCDF file to read
@@ -216,7 +216,7 @@ class ncNWRC(ncEarth):
     kmlname='NWRC.kml'
     progname='NWRC'
 
-    def __init__(self,filename,hsize=10,istep=0):
+    def __init__(self,filename,hsize=5,istep=0):
         """
         Overloaded constructor for Netcdf output files from SMRF or AWSM:
            filename : output NetCDF file
@@ -287,7 +287,7 @@ class ncNWRC_mov(object):
     A class the uses ncNWRC to create animations from Netcdf time series images.
     """
 
-    def __init__(self,filename,hsize=10,nstep=None):
+    def __init__(self,filename,hsize=5,nstep=None):
         """
         Class constructor:
         filename : NetCDF output file name

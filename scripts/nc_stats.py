@@ -4,42 +4,11 @@ from netCDF4 import Dataset
 import numpy as np
 import progressbar as pb
 import argparse
-import os
 from collections import OrderedDict
+import sys
 
-def calc_stats(img, non_zero = False):
-    '''
-    args:
-        img: a numpy array of any dimension and size
-        non_zero: Calculate stats not including zero (defaults false)
-    returns:
-        result: dictionary containing max, min, avg standard deviation
-    '''
-    result = OrderedDict()
-    if non_zero:
-        img_id = img!=0.0
-    else:
-        img_id = img==img
 
-    result['maximum'] = np.max(img[img_id])
-    result['minimum'] = np.min(img[img_id])
-    result['avgerage'] = np.average(img[img_id])
-    result['standard deviation'] = np.std(img[img_id])
-    return result
-
-def return_img_and_message(img,dimension_value):
-
-    if dimension_value == None:
-        value_str = "All"
-        img = img[:]
-    else:
-        value_str = dimension_value
-        img = img[dimension_value]
-
-    data_description = "{0} = {1}".format(name,value_str)
-    return img,data_description
-
-def main():
+def calc_stats():
 
     parser = argparse.ArgumentParser(description='Calculate Statistics on NetCDF Files.')
 
@@ -49,68 +18,104 @@ def main():
     parser.add_argument('variable', metavar='v', type=str,
                         help='Name of the variable in the netcdf file to process.')
 
-    parser.add_argument('-t', dest='timestep', help="Isolates a timestep from file", )
-    parser.add_argument('-x', dest='x_coor', help="Specify an x coordinate to run statistics on ")
-    parser.add_argument('-y', dest='y_coor', help="Specify an y coordinate to run statistics on ")
-    parser.add_argument('-nz', dest='non_zero', action='store_true', help="Disables any zero from being the min value")
+    parser.add_argument('-t', dest='time', help="Isolates a timestep from file", default = 'all')
+    parser.add_argument('-x', dest='x', help="Specify an x coordinate to run statistics on ", default = 'all')
+    parser.add_argument('-y', dest='y', help="Specify an y coordinate to run statistics on ", default = 'all')
 
     args = parser.parse_args()
-    filename = os.path.abspath(os.path.expanduser(args.filename))
-    if not os.path.isfile(filename):
-        print("File Does not exist. {0}".format(filename))
-        sys.exit()
-
-    print "Processing netCDF statistics...\n"
-    print "Filename: {0}".format(filename)
 
     #Open data set
-    ds = Dataset(filename, 'r')
-    f = ds.variables[args.variable]
+    ds = Dataset(args.filename, 'r')
+    print("\n=========== NC_STATS v0.1.0 ==========")
+    print("\nProcessing netCDF statistics...")
+    print("\tFilename: {0}".format(args.filename))
+    print("\tvariable: {0}".format(args.variable))
 
-    #collect important info create arrays
-    nt,nx,ny = np.shape(f)
+    # Build our basic operations list
+    base_dict = OrderedDict({})
+    operations = ['max','min','average']
+    for o in operations:
+        base_dict[o] = None
 
-    #Create a progress bar to info the user
-    bar = pb.ProgressBar(max_value=nt)
+    # Always output stats on full dimension of the data
+    data_description = OrderedDict()
+    description = None
 
-    #Use an dict to store stats for easy recall
-    data = OrderedDict()
+    # Check user inputs
+    for i,d in enumerate(ds.dimensions.keys()):
+        if hasattr(args,d.lower()):
+            a = getattr(args,d.lower())
 
-    # Always show the user the whole basin and through all time.
-    img = f[:,:,:]
-    data['Entire Image Domain'] = calc_stats(img,args.non_zero)
+            if a != 'all':
 
-    #Check what the user wants. Always output basin wide/all time results
-    data_description = 'At '
-
-    if args.timestep != None or args.y_coor !=None or args.x_coor != None:
-
-        for arg in [args.timestep,args.y_coor,args.x_coor]:
-            img,msg = return_index_and_message(img,arg)
-            data_description += msg
-
-
-        data[data_description] = calc_stats(new_img, non_zero = args.non_zero)
-
-
-    msg_str =  " "*3 + "NetCDF statistics" + " "*3
-
-    print "="*len(msg_str)
-    print msg_str
-    print "="*len(msg_str)
-    print ""
-    print "Total Time Steps = {0}".format(nt)
-    print "Total Number of Columns = {0}".format(nx)
-    print "Total Number of Rows = {0}".format(ny)
-    print ""
-
-    #Output to screen
-    for k,v in data.items():
-        for description,value in v.items():
-            print "{0}: {1}".format(description,value)
+                # Confirm user provided number
+                try:
+                    a = float(a)
+                except:
+                    print("Please use numbers for {0} dimension".format(d))
 
 
+                if a not in ds.variables[d][:]:
+                    print("{0} = {1} is not the in the data domain!".format(d,a))
+                    print(ds.variables[d][:])
+                    sys.exit()
+
+            # Form a description of data requested
+            if i==0:
+                description = "{0}={1}".format(d,a)
+            else:
+                description += ", {0}={1}".format(d,a)
+
+    # If a description was formed, add it to our data to be processed
+    if description != None:
+        data_description[description] = base_dict.copy()
+
+    # Perform all calcs
+    for op in operations:
+        fn = getattr(np,op)
+
+        # Cycle through all the requested data
+        print("")
+        print(" Calculating {0} of {1} for:".format(op, args.variable))
+        for desc, data in data_description.items():
+            # User requested single row for all timesteps
+            print("\t{0}".format(desc.lower()))
+
+            if desc == 'all time':
+                data_description[desc][op] = fn(ds.variables[args.variable][:])
+
+            else:
+                ind_str = desc.split(',')
+                ind = ""
+
+                #Form a string indice to use
+                for i,z in enumerate(ind_str):
+                    d = z.split('=')
+
+                    if d[-1] == 'all':
+                        c = ":"
+                    else:
+                        c = d[-1]
+
+                    if i == 0:
+                        ind += c
+                    else:
+                        ind += ","+c
+
+                data_description[desc][op] = eval('fn(ds.variables[args.variable][{0}])'.format(ind))
 
     ds.close()
+    msg_str =  " "*3 + "NetCDF statistics" + " "*3
+    print('')
+    print("="*len(msg_str))
+    print(msg_str)
+    print("="*len(msg_str))
+    #Output to screen
+    for k,ops in data_description.items():
+        print('')
+        for op,value in ops.items():
+            print("{0} {1} for {2}: {3:0.4f}".format(args.variable,op,k,value))
+    print("")
+
 if __name__ == '__main__':
-    main()
+    calc_stats()
