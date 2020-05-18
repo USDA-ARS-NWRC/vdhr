@@ -22,4 +22,7 @@ Usage
 
 python cli.py ~/projects/AWSM/test_data/RME_run/output/rme/devel/wy1998/rme_test/runs/run1464_1680/snow.nc  thickness
 
+GDAL CONVERSION
+---------------
+gdal_translate -of png -sds cool_snow.nc -b 3  cool_snow.png -a_srs EPSG:3718
 

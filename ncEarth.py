@@ -22,7 +22,7 @@ Date: April 17, 2018
 from matplotlib import pylab
 import numpy as np
 from netCDF4 import Dataset
-import cStringIO
+import io
 from datetime import datetime,timedelta
 import zipfile
 import shutil,os
@@ -140,7 +140,7 @@ class ncEarth(object):
         self.process_image()
 
         # create a string buffer to save the file
-        im=cStringIO.StringIO()
+        im=io.StringIO()
 
         pylab.savefig(im,format='png',transparent=True,dpi = 1200)
 

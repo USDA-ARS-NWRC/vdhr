@@ -2,4 +2,8 @@
 *.swp
 *.kml
 *.kmz
-
+*.nc
+*.xml
+*.png
+*.tif
+*.tiff
